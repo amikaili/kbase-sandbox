@@ -22,7 +22,7 @@ public class CondorSubmitJob
                 ClassAdStructAttr[] jobAd =
                 {
                  createStringAttribute("Owner", owner), // Need to insert kbase username@realm here
-                 createStringAttribute("Iwd", workingDirectory),
+                 createStringAttribute("Iwd", workingDirectory), // Awe creates a working directory per job (uuid) we may need to generate one, or use the job id.  Not sure if condor will create this directory.  If not, we may need to handle working directory creation in the async runner script. 
                  createIntAttribute("JobUniverse", 5), // Vanilla Universe
                  createStringAttribute("Cmd", "run_async_srv_method.sh"),
                  createIntAttribute("JobStatus", 1), // Idle
