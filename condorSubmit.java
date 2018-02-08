@@ -4,33 +4,33 @@ import java.net.MalformedURLException;
 import java.rmi.RemoteException;
 import javax.xml.rpc.ServiceException;
 
-public class CondorSubmitDAG
+public class CondorSubmitJob
 {
         private static ClassAdStructAttr[] buildJobAd(String owner,
-                                                 String dagFileLocation,
+                                                 String jobFileLocation,
                                                  int clusterId,
                                                  int jobId)
         {
-                String dagOutputFileLocation = dagFileLocation + ".dagman.out";
-                String dagLogFileLocation = dagFileLocation + ".dagman.log";
-                String stdOutLocation = dagFileLocation + ".stdout";
-                String stdErrLocation = dagFileLocation + ".stderr";
-                String dagmanLockFile = dagFileLocation + ".lock";
+                String jobOutputFileLocation = jobFileLocation + ".job.out";
+                String jobLogFileLocation = jobFileLocation + ".job.log";
+                String stdOutLocation = jobFileLocation + ".stdout";
+                String stdErrLocation = jobFileLocation + ".stderr";
+                String dagmanLockFile = jobFileLocation + ".lock";
                 String workingDirectory =
-                        dagFileLocation.substring(0, dagFileLocation.lastIndexOf("/"));
+                        jobFileLocation.substring(0, jobFileLocation.lastIndexOf("/"));
                 
                 ClassAdStructAttr[] jobAd =
                 {
-                 createStringAttribute("Owner", owner),
+                 createStringAttribute("Owner", owner), // Need to insert kbase username@realm here
                  createStringAttribute("Iwd", workingDirectory),
-                 createIntAttribute("JobUniverse", 7), // Scheduler Universe
-                 createStringAttribute("Cmd", "/usr/bin/condor_dagman"),
+                 createIntAttribute("JobUniverse", 5), // Vanilla Universe
+                 createStringAttribute("Cmd", "run_async_srv_method.sh"),
                  createIntAttribute("JobStatus", 1), // Idle
                  createStringAttribute("Env",
-                                       "_CONDOR_MAX_DAGMAN_LOG=0;" +
-                                       "_CONDOR_DAGMAN_LOG=" + dagOutputFileLocation),
+                                       "_CONDOR_MAX_LOG=0;" +
+                                       "_CONDOR_LOG=" + jobOutputFileLocation), //leaving in for example setting env var - not needed for kbase
                  createIntAttribute("JobNotification", 0), // Never
-                 createStringAttribute("UserLog", dagLogFileLocation),
+                 createStringAttribute("UserLog", jobLogFileLocation),
                  createStringAttribute("RemoveKillSig", "SIGUSR1"),
                  createStringAttribute("Out", stdOutLocation),
                  createStringAttribute("Err", stdErrLocation),
@@ -41,11 +41,7 @@ public class CondorSubmitDAG
                                            " (ExitCode =!= UNDEFINED && " +
                                            "  ExitCode >=0 && ExitCode <= 2))"),
                  createStringAttribute("Arguments",
-                                       "-f -l . -Debug 3 " +
-                                       "-AutoRescue 1 -DoRescueFrom 0 " +
-                                       "-Allowversionmismatch " + // Often safe
-                                       "-Lockfile " + dagmanLockFile + " " +
-                                       "-Dag " + dagFileLocation),
+                                       "-f -l . -Debug 3 "), // also leaving - we can modify for kbase arguments
                  createIntAttribute("ClusterId", clusterId),
                  createIntAttribute("ProcId", jobId)};
 
@@ -89,7 +85,7 @@ public class CondorSubmitDAG
         {
                URL scheddLocation = new URL(arguments[0]);
                String owner = arguments[1];
-               String dagFileLocation = arguments[2];
+               String jobFileLocation = arguments[2];
 
                 // Get a handle on a schedd we can make SOAP call on.
                 CondorScheddLocator scheddLocator = new CondorScheddLocator();
@@ -100,27 +96,27 @@ public class CondorSubmitDAG
                 TransactionAndStatus transactionAndStatus = schedd.beginTransaction(60);
                 
                 Transaction transaction = transactionAndStatus.getTransaction();
-                // Get a new cluster for the DAG job.
+                // Get a new cluster for the job.
                 IntAndStatus clusterIdAndStatus = schedd.newCluster(transaction);
                 int clusterId = clusterIdAndStatus.getInteger();
                 
-                // Get a new Job ID (aka a ProcId) for the DAG Job.
+                // Get a new Job ID (aka a ProcId) for the Job.
                 IntAndStatus jobIdAndStatus = schedd.newJob(transaction, clusterId);
                 int jobId = jobIdAndStatus.getInteger();
                 
-                // Build the DAG's ClassAd.
+                // Build the Job's ClassAd.
                 ClassAdStructAttr[] jobAd = buildJobAd(owner,
-                                             dagFileLocation,
+                                             jobFileLocation,
                                              clusterId,
                                              jobId);
                 
-                // Submit the DAG's ClassAd.
+                // Submit the Job's ClassAd.
                 schedd.submit(transaction, clusterId, jobId, jobAd);
                 
                 // Commit the transaction.
                 schedd.commitTransaction(transaction);
 
-                // Ask the Schedd to kick off the DAG immediately.
+                // Ask the Schedd to kick off the Job immediately.
                 schedd.requestReschedule();
         }
 }
